@@ -1,0 +1,20 @@
+redis:
+  host: localhost
+  port: 6379
+  username:
+  password:
+
+bluesky:
+  apiurl: https://bsky.social/xrpc
+  username: javabubble.bsky.social
+  password:
+
+poster:
+  since: 2024-11-21T00:00:00Z
+  scheduler:
+    frequencyminutes: 15
+  tags:
+    - java
+    - Java
+    - javabubble
+    - JavaBubble
