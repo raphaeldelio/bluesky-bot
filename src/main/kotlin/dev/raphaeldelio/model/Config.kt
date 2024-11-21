@@ -1,7 +1,5 @@
 package dev.raphaeldelio.model;
 
-import java.time.LocalDateTime
-
 data class Config(
     val redis: RedisConfig,
     val bluesky: BlueskyConfig,
