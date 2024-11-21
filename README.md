@@ -1,6 +1,6 @@
 # Bluesky Bot
 
-A Kotlin-based bot for interacting with the Bluesky platform. This bot fetches posts based on specified tags, analyzes them, and performs actions such as reposting and following users. The bot leverages Redis for caching and scheduling tasks at specified intervals.
+A Kotlin-based bot for interacting with the Bluesky platform. This bot fetches posts based on specified tags and performs actions such as reposting and following users. The bot leverages Redis for caching and scheduling tasks at specified intervals.
 
 ## Features
 
