@@ -1,4 +1,4 @@
-package dev.raphaeldelio.model;
+package dev.raphaeldelio.model
 
 data class Config(
     val redis: RedisConfig,
@@ -22,9 +22,20 @@ data class BlueskyConfig(
 data class PosterConfig(
     val since: String,
     val scheduler: SchedulerConfig,
+    val actions: ActionsConfig,
     val tags: List<String>
 )
 
 data class SchedulerConfig(
     val frequencyminutes: Int
+)
+
+data class ActionsConfig(
+    val repost: ActionDetailConfig,
+    val like: ActionDetailConfig,
+    val follow: ActionDetailConfig
+)
+
+data class ActionDetailConfig(
+    val enabled: Boolean
 )
