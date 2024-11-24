@@ -5,7 +5,7 @@ A Kotlin-based bot for interacting with the Bluesky platform. This bot fetches p
 ## Features
 
 - Fetches posts from Bluesky based on predefined tags.
-- Performs actions like reposting and following users.
+- Performs actions like reposting, liking, and following users.
 - Utilizes Redis for state management and caching.
 - Periodically runs tasks using a customizable scheduler.
 
@@ -33,6 +33,13 @@ poster:
   since: 2024-01-01T00:00:00Z
   scheduler:
     frequencyminutes: 15
+  actions:
+    repost:
+      enabled: true
+    like:
+      enabled: true
+    follow:
+      enabled: true
   tags:
     - java
     - javabubble
