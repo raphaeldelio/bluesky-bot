@@ -43,3 +43,7 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+/fly.toml
+/.github/workflows/fly-deploy.yml
+/src/main/resources/config-prod.yaml
+/src/main/resources/config.yaml

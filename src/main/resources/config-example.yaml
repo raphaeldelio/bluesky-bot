@@ -13,6 +13,13 @@ poster:
   since: 2024-11-21T00:00:00Z
   scheduler:
     frequencyminutes: 15
+  actions:
+    repost:
+      enabled: true
+    like:
+      enabled: true
+    follow:
+      enabled: true
   tags:
     - java
     - Java

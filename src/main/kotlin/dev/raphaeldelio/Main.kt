@@ -65,8 +65,9 @@ fun process(posterConfig: PosterConfig, redisService: RedisService, blueskyServi
         .flatMap { tag -> blueskyService.searchPosts(token, lastRun, "#$tag") }
 
     posts.forEach { post ->
-        blueskyService.repost(token, post)
-        blueskyService.followUser(token, post.author.did)
+        if (posterConfig.actions.like.enabled) blueskyService.handlePostAction(token, post, BlueskyService.Action.LIKE)
+        if (posterConfig.actions.repost.enabled) blueskyService.handlePostAction(token, post, BlueskyService.Action.REPOST)
+        if (posterConfig.actions.follow.enabled) blueskyService.followUser(token, post.author.did)
     }
 
     redisService.set("lastRun", now.toString())
