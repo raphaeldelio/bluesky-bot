@@ -23,6 +23,13 @@ dependencies {
     implementation("redis.clients:jedis:5.2.0")
 
     testImplementation(kotlin("test"))
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.3")
+    testImplementation("org.assertj:assertj-core:3.26.3")
+    testImplementation("org.testcontainers:testcontainers:1.20.4")
+    testImplementation("org.testcontainers:junit-jupiter:1.20.4")
+    testImplementation("com.github.tomakehurst:wiremock:3.0.1")
+
 }
 
 application {
