@@ -3,42 +3,25 @@ package dev.raphaeldelio.service
 import dev.raphaeldelio.Logger
 import dev.raphaeldelio.model.*
 import org.http4k.client.ApacheClient
+import org.http4k.client.ApacheClient.invoke
 import org.http4k.core.Method
 import org.http4k.core.Request
+import org.http4k.core.Request.Companion.invoke
 import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.format.Jackson
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
-class BlueskyService(
+class PostService(
     blueskyConfig: BlueskyConfig,
     private val redisService: RedisService
 ) {
     private val client = ApacheClient()
     private val apiUrl = blueskyConfig.apiurl
-    private val username = blueskyConfig.username
-    private val password = blueskyConfig.password
 
     private fun sendRequest(request: Request): Response {
         return client(request)
-    }
-
-    fun getAccessToken(): String {
-        val request = Request(Method.POST, "$apiUrl/com.atproto.server.createSession")
-            .header("Content-Type", "application/json")
-            .body(Jackson.asFormatString(mapOf("identifier" to username, "password" to password)))
-
-        val response = sendRequest(request)
-        return if (response.status == Status.OK) {
-            val result = Jackson.asA(response.bodyString(), LoginResponse::class)
-            redisService.set("did", result.did)
-            Logger.info("✅ Login successful. DID: ${result.did}")
-            result.accessJwt
-        } else {
-            Logger.info("⚠️ Authentication failed: ${response.status}")
-            ""
-        }
     }
 
     fun searchPosts(token: String, since: OffsetDateTime, tag: String): List<Post> {
@@ -99,47 +82,6 @@ class BlueskyService(
             redisService.setAdd(redisKey, post.uri)
         } else {
             Logger.info("⚠️ Failed to ${action.presentTense}: ${post.uri}. Error: ${response.bodyString()}")
-        }
-    }
-
-    fun followUser(token: String, authorDid: String) {
-        handleUserAction(
-            token = token,
-            actionKey = "followedAuthors",
-            uniqueId = authorDid,
-            data = FollowData(
-                repo = redisService.get("did") ?: throw IllegalArgumentException("DID not found in Redis"),
-                record = FollowRecord(subject = authorDid)
-            ),
-            actionName = "follow",
-            collection = "com.atproto.repo.createRecord"
-        )
-    }
-
-    private fun handleUserAction(
-        token: String,
-        actionKey: String,
-        uniqueId: String,
-        data: Any,
-        actionName: String,
-        collection: String
-    ) {
-        if (redisService.setContains(actionKey, uniqueId)) {
-            Logger.info("🔁 Already ${actionName}ed: $uniqueId. Skipping.")
-            return
-        }
-
-        val request = Request(Method.POST, "$apiUrl/$collection")
-            .header("Authorization", "Bearer $token")
-            .header("Content-Type", "application/json")
-            .body(Jackson.asFormatString(data))
-
-        val response = client(request)
-        if (response.status == Status.OK) {
-            Logger.info("✅ Successfully ${actionName}ed: $uniqueId")
-            redisService.setAdd(actionKey, uniqueId)
-        } else {
-            Logger.info("⚠️ Failed to ${actionName}: $uniqueId. Error: ${response.bodyString()}")
         }
     }
 
