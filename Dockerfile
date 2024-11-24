@@ -1,6 +1,8 @@
 FROM openjdk:22-ea-31-jdk-slim-bullseye
 
-COPY /build/libs/bluesky-reposter-all.jar /bin/runner/run.jar
-WORKDIR /bin/runner
+WORKDIR /app
+
+COPY /build/libs/bluesky-reposter-all.jar /app/run.jar
+#COPY /src/main/resources/config-prod.yaml /config/config.yaml
 
 CMD ["java","-jar","run.jar"]
