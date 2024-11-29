@@ -2,22 +2,26 @@ package dev.raphaeldelio
 
 import dev.raphaeldelio.model.PosterConfig
 import dev.raphaeldelio.model.RedisConfig
-import dev.raphaeldelio.service.BlueskyService
+import dev.raphaeldelio.service.AuthenticationService
 import dev.raphaeldelio.service.ConfigService
+import dev.raphaeldelio.service.PostService
 import dev.raphaeldelio.service.RedisService
-import redis.clients.jedis.JedisPool
+import dev.raphaeldelio.service.UserService
+import redis.clients.jedis.JedisPooled
 import java.time.OffsetDateTime
 import kotlin.concurrent.timer
 
 fun main() {
     val config = ConfigService().loadConfig()
-    val jedisPool = createJedisPool(config.redis)
-    val redisService = RedisService(jedisPool)
-    val blueskyService = BlueskyService(config.bluesky, redisService)
+    val jedisPooled = createJedisPooled(config.redis)
+    val redisService = RedisService(jedisPooled)
+    val authenticationService = AuthenticationService(config.bluesky, redisService)
+    val postService = PostService(config.bluesky, redisService)
+    val userService = UserService(config.bluesky, redisService)
 
     Runtime.getRuntime().addShutdownHook(Thread {
         Logger.info("⏼ Shutting down application. Closing Redis connections.")
-        jedisPool.close()
+        jedisPooled.close()
     })
 
     timer(
@@ -27,19 +31,19 @@ fun main() {
         period = config.poster.scheduler.frequencyminutes * 60 * 1000L
     ) {
         runCatching {
-            process(config.poster, redisService, blueskyService)
+            process(config.poster, redisService, authenticationService, postService, userService)
         }.onFailure {
             Logger.error("Failed to process task: ${it.message}")
             Logger.info("Closing Redis connections.")
-            jedisPool.close()
+            jedisPooled.close()
             throw it
         }
     }
 }
 
-fun createJedisPool(redisConfig: RedisConfig): JedisPool {
+fun createJedisPooled(redisConfig: RedisConfig): JedisPooled {
     Logger.info("Creating JedisPool for Redis at ${redisConfig.host}:${redisConfig.port}")
-    return JedisPool(
+    return JedisPooled(
         redisConfig.host,
         redisConfig.port,
         redisConfig.username,
@@ -47,7 +51,12 @@ fun createJedisPool(redisConfig: RedisConfig): JedisPool {
     )
 }
 
-fun process(posterConfig: PosterConfig, redisService: RedisService, blueskyService: BlueskyService) {
+fun process(
+    posterConfig: PosterConfig,
+    redisService: RedisService,
+    authenticationService: AuthenticationService,
+    postService: PostService,
+    userService: UserService) {
     Logger.info("🚀 Starting task.")
     val now = OffsetDateTime.now()
     val lastRun = OffsetDateTime.parse(
@@ -55,19 +64,21 @@ fun process(posterConfig: PosterConfig, redisService: RedisService, blueskyServi
     )
     Logger.info("Fetching posts since $lastRun")
 
-    val token = blueskyService.getAccessToken()
+    val token = authenticationService.getAccessToken()
     if (token.isEmpty()) {
         Logger.info("🔴 Failed to retrieve access token. Skipping task.")
         return
     }
 
     val posts = posterConfig.tags
-        .flatMap { tag -> blueskyService.searchPosts(token, lastRun, "#$tag") }
+        .flatMap { tag -> postService.searchPosts(token, lastRun, "#$tag") }
 
     posts.forEach { post ->
-        if (posterConfig.actions.like.enabled) blueskyService.handlePostAction(token, post, BlueskyService.Action.LIKE)
-        if (posterConfig.actions.repost.enabled) blueskyService.handlePostAction(token, post, BlueskyService.Action.REPOST)
-        if (posterConfig.actions.follow.enabled) blueskyService.followUser(token, post.author.did)
+        if (posterConfig.actions.like.enabled) postService.handlePostAction(token, post, PostService.Action.LIKE)
+        if (posterConfig.actions.repost.enabled) postService.handlePostAction(token, post, PostService.Action.REPOST)
+        if (posterConfig.actions.follow.enabled) userService.followUser(token, post.author.did)
+
+        userService.getProfile(token, post.author.did)
     }
 
     redisService.set("lastRun", now.toString())
