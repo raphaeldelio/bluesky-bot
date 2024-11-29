@@ -1,6 +1,7 @@
 package dev.raphaeldelio.service
 
 import com.github.tomakehurst.wiremock.client.WireMock.*
+import com.github.tomakehurst.wiremock.matching.StringValuePattern
 import dev.raphaeldelio.model.BlueskyConfig
 import dev.raphaeldelio.model.Profile
 import org.assertj.core.api.Assertions.assertThat
@@ -44,7 +45,7 @@ class UserServiceTest : BaseTest() {
         val did = "did:example:123"
         val token = "test-access-token"
         val expectedProfile = createTestProfile(did)
-        stubApiGet("/profile/$did", token, expectedProfile)
+        stubApiGet("/app.bsky.actor.getProfile/", token, expectedProfile, mapOf("actor" to equalTo(did)))
 
         val userService = createUserService()
         val redisService = createRedisService()
@@ -55,7 +56,7 @@ class UserServiceTest : BaseTest() {
         // Assert
         verifyProfile(actualProfile, expectedProfile)
         verifyProfileInRedis(redisService, did, expectedProfile)
-        verifyApiGet("/profile/$did", token)
+        verifyApiGet("/app.bsky.actor.getProfile/", token, mapOf("actor" to equalTo(did)))
     }
 
     @Test
@@ -117,10 +118,11 @@ class UserServiceTest : BaseTest() {
         )
     }
 
-    private fun stubApiGet(endpoint: String, token: String, responseBody: Any) {
+    private fun stubApiGet(endpoint: String, token: String, responseBody: Any, params: Map<String, StringValuePattern> = emptyMap()) {
         wireMockServer.stubFor(
             get(urlPathEqualTo(endpoint))
                 .withHeader("Authorization", equalTo("Bearer $token"))
+                .withQueryParams(params)
                 .willReturn(aResponse().withStatus(200).withBody(Jackson.asFormatString(responseBody)))
         )
     }
@@ -146,11 +148,14 @@ class UserServiceTest : BaseTest() {
         wireMockServer.verify(verifier)
     }
 
-    private fun verifyApiGet(endpoint: String, token: String) {
-        wireMockServer.verify(
-            getRequestedFor(urlPathEqualTo(endpoint))
-                .withHeader("Authorization", equalTo("Bearer $token"))
-        )
+    private fun verifyApiGet(endpoint: String, token: String, params: Map<String, StringValuePattern> = emptyMap()) {
+        val request = getRequestedFor(urlPathEqualTo(endpoint))
+            .withHeader("Authorization", equalTo("Bearer $token"))
+        for ((key, value) in params) {
+            request.withQueryParam(key, value)
+        }
+
+        wireMockServer.verify(request)
     }
 
     private fun verifyNoApiCall(endpoint: String) {
