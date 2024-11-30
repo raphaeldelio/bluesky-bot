@@ -9,11 +9,17 @@ import org.http4k.core.Status
 import org.http4k.format.Jackson
 
 class UserService(
-    private val blueskyConfig: BlueskyConfig,
+    blueskyConfig: BlueskyConfig,
     private val redisService: RedisService
 ) {
     private val client = ApacheClient()
     private val apiUrl = blueskyConfig.apiurl
+
+    fun getAllFollowedUsers(): Set<String> {
+        return redisService.setGetAll("followedAuthors").also {
+            Logger.info("🔍 Retrieved ${it.size} followed authors from Redis")
+        }
+    }
 
     fun followUser(token: String, authorDid: String) {
         val repo = redisService.get("did") ?: error("DID not found in Redis")
@@ -30,15 +36,15 @@ class UserService(
     }
 
     fun getProfile(token: String, did: String): Profile {
-        val cacheKey = "profile:$did"
+        val key = "profile:$did"
 
-        // Try fetching from cache
-        return redisService.getJsonAs<Profile>(cacheKey)?.also {
-            Logger.info("ℹ️ Profile for DID: $did retrieved from Redis cache")
+        // Try fetching from Redis
+        return redisService.jsonGetAs<Profile>(key)?.also {
+            Logger.info("ℹ️ Profile for DID: $did retrieved from Redis")
         } ?: run {
-            // Fetch from API if not cached
+            // Fetch from API if not stored
             fetchProfileFromApi(token, did).also { profile ->
-                redisService.setJson(cacheKey, profile)
+                redisService.jsonSet(key, profile)
                 Logger.info("🗄️ Profile for DID: $did stored in Redis")
             }
         }

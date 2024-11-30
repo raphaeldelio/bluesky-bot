@@ -60,12 +60,12 @@ class UserServiceTest : BaseTest() {
     }
 
     @Test
-    fun `should fetch profile from Redis cache when available`() {
+    fun `should fetch profile from Redis when available`() {
         // Arrange
         val did = "did:example:123"
-        val expectedProfile = createTestProfile(did, handle = "cached-handle", displayName = "Cached User")
+        val expectedProfile = createTestProfile(did, handle = "stored-handle", displayName = "Stored User")
         val redisService = createRedisService()
-        cacheProfileInRedis(redisService, did, expectedProfile)
+        storeProfileInRedis(redisService, did, expectedProfile)
 
         val userService = createUserService()
 
@@ -127,8 +127,8 @@ class UserServiceTest : BaseTest() {
         )
     }
 
-    private fun cacheProfileInRedis(redisService: RedisService, did: String, profile: Profile) {
-        redisService.setJson("profile:$did", profile)
+    private fun storeProfileInRedis(redisService: RedisService, did: String, profile: Profile) {
+        redisService.jsonSet("profile:$did", profile)
     }
 
     private fun verifyProfile(actual: Profile, expected: Profile) {
@@ -136,9 +136,9 @@ class UserServiceTest : BaseTest() {
     }
 
     private fun verifyProfileInRedis(redisService: RedisService, did: String, expected: Profile) {
-        val cachedProfile = redisService.getJsonAs<Profile>("profile:$did")
-        assertThat(cachedProfile).isNotNull
-        assertThat(Jackson.asFormatString(cachedProfile!!)).isEqualTo(Jackson.asFormatString(expected))
+        val storedProfile = redisService.jsonGetAs<Profile>("profile:$did")
+        assertThat(storedProfile).isNotNull
+        assertThat(Jackson.asFormatString(storedProfile!!)).isEqualTo(Jackson.asFormatString(expected))
     }
 
     private fun verifyApiPost(endpoint: String, token: String, bodyChecks: Map<String, String>) {

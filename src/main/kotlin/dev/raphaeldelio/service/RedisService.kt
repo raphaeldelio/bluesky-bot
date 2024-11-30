@@ -23,16 +23,20 @@ class RedisService(private val jedisPooled: JedisPooled) {
         return jedisPooled.sismember(key, value)
     }
 
-    fun setJson(key: String, json: Any) {
+    fun setGetAll(key: String): Set<String> {
+        return jedisPooled.smembers(key)
+    }
+
+    fun jsonSet(key: String, json: Any) {
         jedisPooled.jsonSet(key, Jackson.asFormatString(json))
     }
 
-    fun getJson(key: String): Any? {
+    fun jsonGet(key: String): Any? {
         return jedisPooled.jsonGet(key) ?: return null
     }
 
-    inline fun <reified T: Any> getJsonAs(key: String): T? {
-        val json = getJson(key) ?: return null
+    inline fun <reified T: Any> jsonGetAs(key: String): T? {
+        val json = jsonGet(key) ?: return null
         return Jackson.asA<T>(Jackson.asFormatString(json))
     }
 }

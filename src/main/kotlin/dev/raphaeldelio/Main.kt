@@ -4,6 +4,8 @@ import dev.raphaeldelio.model.PosterConfig
 import dev.raphaeldelio.model.RedisConfig
 import dev.raphaeldelio.service.AuthenticationService
 import dev.raphaeldelio.service.ConfigService
+import dev.raphaeldelio.service.DynamicConfigService
+import dev.raphaeldelio.service.MigrationService
 import dev.raphaeldelio.service.PostService
 import dev.raphaeldelio.service.RedisService
 import dev.raphaeldelio.service.UserService
@@ -18,6 +20,8 @@ fun main() {
     val authenticationService = AuthenticationService(config.bluesky, redisService)
     val postService = PostService(config.bluesky, redisService)
     val userService = UserService(config.bluesky, redisService)
+    val dynamicConfigService = DynamicConfigService(redisService)
+    val migrationService = MigrationService(userService, dynamicConfigService)
 
     Runtime.getRuntime().addShutdownHook(Thread {
         Logger.info("⏼ Shutting down application. Closing Redis connections.")
@@ -31,7 +35,12 @@ fun main() {
         period = config.poster.scheduler.frequencyminutes * 60 * 1000L
     ) {
         runCatching {
-            process(config.poster, redisService, authenticationService, postService, userService)
+            val token = authenticationService.getAccessToken()
+            if (token.isEmpty()) {
+                Logger.info("🔴 Failed to retrieve access token. Skipping task.")
+            }
+            migrationService.migrate(token)
+            process(config.poster, redisService, postService, userService, token)
         }.onFailure {
             Logger.error("Failed to process task: ${it.message}")
             Logger.info("Closing Redis connections.")
@@ -54,21 +63,15 @@ fun createJedisPooled(redisConfig: RedisConfig): JedisPooled {
 fun process(
     posterConfig: PosterConfig,
     redisService: RedisService,
-    authenticationService: AuthenticationService,
     postService: PostService,
-    userService: UserService) {
+    userService: UserService,
+    token: String) {
     Logger.info("🚀 Starting task.")
     val now = OffsetDateTime.now()
     val lastRun = OffsetDateTime.parse(
         redisService.get("lastRun") ?: posterConfig.since.toString()
     )
     Logger.info("Fetching posts since $lastRun")
-
-    val token = authenticationService.getAccessToken()
-    if (token.isEmpty()) {
-        Logger.info("🔴 Failed to retrieve access token. Skipping task.")
-        return
-    }
 
     val posts = posterConfig.tags
         .flatMap { tag -> postService.searchPosts(token, lastRun, "#$tag") }
