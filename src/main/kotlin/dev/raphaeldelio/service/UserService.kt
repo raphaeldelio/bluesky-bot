@@ -9,80 +9,94 @@ import org.http4k.core.Status
 import org.http4k.format.Jackson
 
 class UserService(
-    blueskyConfig: BlueskyConfig,
+    private val blueskyConfig: BlueskyConfig,
     private val redisService: RedisService
 ) {
     private val client = ApacheClient()
     private val apiUrl = blueskyConfig.apiurl
 
     fun followUser(token: String, authorDid: String) {
-        handleUserAction(
+        val repo = redisService.get("did") ?: error("DID not found in Redis")
+        val followData = FollowData(repo = repo, record = FollowRecord(subject = authorDid))
+
+        performAction(
             token = token,
             actionKey = "followedAuthors",
             uniqueId = authorDid,
-            data = FollowData(
-                repo = redisService.get("did") ?: throw IllegalArgumentException("DID not found in Redis"),
-                record = FollowRecord(subject = authorDid)
-            ),
+            data = followData,
             actionName = "follow",
-            collection = "com.atproto.repo.createRecord"
+            endpoint = "com.atproto.repo.createRecord"
         )
     }
 
     fun getProfile(token: String, did: String): Profile {
         val cacheKey = "profile:$did"
-        // Check if the profile is already in Redis
-        val cachedProfile = redisService.getJsonAs<Profile>(cacheKey)
-        if (cachedProfile != null) {
+
+        // Try fetching from cache
+        return redisService.getJsonAs<Profile>(cacheKey)?.also {
             Logger.info("ℹ️ Profile for DID: $did retrieved from Redis cache")
-            return cachedProfile
-        }
-
-        // Fetch the profile from the API if not in cache
-        val request = Request(Method.GET, "$apiUrl/app.bsky.actor.getProfile/")
-            .header("Authorization", "Bearer $token")
-            .query("actor", did)
-
-        val response = client(request)
-        if (response.status == Status.OK) {
-            Logger.info("✅ Successfully retrieved profile for DID: $did")
-
-            val profile = Jackson.asA(response.bodyString(), Profile::class)
-            redisService.setJson(cacheKey, profile)
-            Logger.info("🗄️ Profile for DID: $did stored in Redis")
-
-            return profile
-        } else {
-            val errorMessage = "⚠️ Failed to retrieve profile for DID: $did. Error: ${response.bodyString()}"
-            Logger.error(errorMessage)
-            throw IllegalStateException(errorMessage)
+        } ?: run {
+            // Fetch from API if not cached
+            fetchProfileFromApi(token, did).also { profile ->
+                redisService.setJson(cacheKey, profile)
+                Logger.info("🗄️ Profile for DID: $did stored in Redis")
+            }
         }
     }
 
-    private fun handleUserAction(
+    private fun fetchProfileFromApi(token: String, did: String): Profile {
+        val request = createGetRequest("$apiUrl/app.bsky.actor.getProfile/", token)
+            .query("actor", did)
+
+        val response = client(request)
+        if (response.status != Status.OK) {
+            handleError("Failed to retrieve profile for DID: $did", response)
+        }
+
+        return Jackson.asA(response.bodyString(), Profile::class).also {
+            Logger.info("✅ Successfully retrieved profile for DID: $did")
+        }
+    }
+
+    private fun performAction(
         token: String,
         actionKey: String,
         uniqueId: String,
         data: Any,
         actionName: String,
-        collection: String
+        endpoint: String
     ) {
         if (redisService.setContains(actionKey, uniqueId)) {
             Logger.info("🔁 Already ${actionName}ed: $uniqueId. Skipping.")
             return
         }
 
-        val request = Request(Method.POST, "$apiUrl/$collection")
-            .header("Authorization", "Bearer $token")
-            .header("Content-Type", "application/json")
-            .body(Jackson.asFormatString(data))
-
+        val request = createPostRequest("$apiUrl/$endpoint", token, data)
         val response = client(request)
+
         if (response.status == Status.OK) {
             Logger.info("✅ Successfully ${actionName}ed: $uniqueId")
             redisService.setAdd(actionKey, uniqueId)
         } else {
-            Logger.info("⚠️ Failed to ${actionName}: $uniqueId. Error: ${response.bodyString()}")
+            handleError("Failed to ${actionName}: $uniqueId", response)
         }
+    }
+
+    private fun createGetRequest(url: String, token: String): Request {
+        return Request(Method.GET, url)
+            .header("Authorization", "Bearer $token")
+    }
+
+    private fun createPostRequest(url: String, token: String, body: Any): Request {
+        return Request(Method.POST, url)
+            .header("Authorization", "Bearer $token")
+            .header("Content-Type", "application/json")
+            .body(Jackson.asFormatString(body))
+    }
+
+    private fun handleError(message: String, response: org.http4k.core.Response) {
+        val errorMessage = "⚠️ $message. Error: ${response.bodyString()}"
+        Logger.error(errorMessage)
+        throw IllegalStateException(errorMessage)
     }
 }
