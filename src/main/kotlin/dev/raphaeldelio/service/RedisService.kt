@@ -1,32 +1,42 @@
 package dev.raphaeldelio.service
 
-import redis.clients.jedis.JedisPool
+import org.http4k.format.Jackson
+import redis.clients.jedis.JedisPooled
 
-class RedisService(private val jedisPool: JedisPool) {
+class RedisService(private val jedisPooled: JedisPooled) {
     fun get(key: String): String? {
-        jedisPool.resource.use { jedis ->
-            return jedis.get(key)
-        }
+        return jedisPooled.get(key)
     }
 
     fun set(key: String, value: String, expireSeconds: Long? = null) {
-        jedisPool.resource.use { jedis ->
-            jedis.set(key, value)
-            if (expireSeconds != null) {
-                jedis.expire(key, expireSeconds)
-            }
+        jedisPooled.set(key, value)
+        if (expireSeconds != null) {
+            jedisPooled.expire(key, expireSeconds)
         }
     }
 
     fun setAdd(key: String, value: String) {
-        jedisPool.resource.use { jedis ->
-            jedis.sadd(key, value)
-        }
+        jedisPooled.sadd(key, value)
     }
 
     fun setContains(key: String, value: String): Boolean {
-        jedisPool.resource.use { jedis ->
-            return jedis.sismember(key, value)
-        }
+        return jedisPooled.sismember(key, value)
+    }
+
+    fun setGetAll(key: String): Set<String> {
+        return jedisPooled.smembers(key)
+    }
+
+    fun jsonSet(key: String, json: Any) {
+        jedisPooled.jsonSet(key, Jackson.asFormatString(json))
+    }
+
+    fun jsonGet(key: String): Any? {
+        return jedisPooled.jsonGet(key) ?: return null
+    }
+
+    inline fun <reified T: Any> jsonGetAs(key: String): T? {
+        val json = jsonGet(key) ?: return null
+        return Jackson.asA<T>(Jackson.asFormatString(json))
     }
 }
