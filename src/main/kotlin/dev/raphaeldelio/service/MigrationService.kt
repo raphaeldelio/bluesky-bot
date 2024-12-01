@@ -8,7 +8,7 @@ class MigrationService(
 ) {
 
     companion object {
-        private val LATEST_VERSION = "0.2.0"
+        private const val LATEST_VERSION = "0.2.0"
     }
 
     fun migrate(token: String) {
