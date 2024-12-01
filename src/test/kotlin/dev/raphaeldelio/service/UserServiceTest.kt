@@ -1,9 +1,9 @@
 package dev.raphaeldelio.service
 
 import com.github.tomakehurst.wiremock.client.WireMock.*
-import com.github.tomakehurst.wiremock.matching.StringValuePattern
 import dev.raphaeldelio.model.BlueskyConfig
 import dev.raphaeldelio.model.Profile
+import dev.raphaeldelio.model.Profiles
 import org.assertj.core.api.Assertions.assertThat
 import org.http4k.format.Jackson
 import org.junit.jupiter.api.Test
@@ -45,7 +45,7 @@ class UserServiceTest : BaseTest() {
         val did = "did:example:123"
         val token = "test-access-token"
         val expectedProfile = createTestProfile(did)
-        stubApiGet("/app.bsky.actor.getProfile/", token, expectedProfile, mapOf("actor" to equalTo(did)))
+        stubApiGet("/app.bsky.actor.getProfile/", token, expectedProfile, mapOf("actor" to did))
 
         val userService = createUserService()
         val redisService = createRedisService()
@@ -56,7 +56,7 @@ class UserServiceTest : BaseTest() {
         // Assert
         verifyProfile(actualProfile, expectedProfile)
         verifyProfileInRedis(redisService, did, expectedProfile)
-        verifyApiGet("/app.bsky.actor.getProfile/", token, mapOf("actor" to equalTo(did)))
+        verifyApiGet("/app.bsky.actor.getProfile/", token, mapOf("actor" to did))
     }
 
     @Test
@@ -77,18 +77,64 @@ class UserServiceTest : BaseTest() {
         verifyNoApiCall("/profile/$did")
     }
 
+
+    @Test
+    fun `should fetch profiles from API and store in Redis`() {
+        // Arrange
+        val dids = listOf("raphaeldelio.dev", "did:plc:evzf2dhqjtmtxcotqz56sdia")
+        val token = "test-access-token"
+        val expectedProfiles = Profiles(dids.map { createTestProfile(it) })
+
+        stubApiGet(
+            endpoint = "/app.bsky.actor.getProfiles",
+            token = token,
+            responseBody = expectedProfiles,
+            params = mapOf("actors" to dids)
+        )
+
+        val userService = createUserService()
+        val redisService = createRedisService()
+
+        // Act
+        val profiles = userService.getProfiles(token, dids.toSet())
+
+        // Assert
+        assertThat(profiles).hasSameSizeAs(dids)
+        profiles.forEach { verifyProfile(it, expectedProfiles.profiles.first { profile -> profile.did == it.did }) }
+        dids.forEach { verifyProfileInRedis(redisService, it, createTestProfile(it)) }
+        verifyApiGet("/app.bsky.actor.getProfiles", token, mapOf("actors" to dids))
+    }
+
+    @Test
+    fun `should fetch profiles from Redis when already stored`() {
+        // Arrange
+        val dids = setOf("did:example:1", "did:example:2")
+        val redisService = createRedisService()
+        dids.forEach {
+            storeProfileInRedis(redisService, it, createTestProfile(it, handle = "stored-handle"))
+        }
+
+        val userService = createUserService()
+
+        // Act
+        val profiles = userService.getProfiles("unused-token", dids)
+
+        // Assert
+        profiles.forEach { verifyProfile(it, createTestProfile(it.did!!, handle = "stored-handle")) }
+        verifyNoApiCall("/app.bsky.actor.getProfiles/")
+    }
+
     // Helper Functions
     private fun createTestProfile(
         did: String,
         handle: String = "test-handle",
-        displayName: String = "Test User",
-        description: String = "Test Description"
+        displayName: String = "Test User"
     ): Profile {
         return Profile(
             did = did,
             handle = handle,
             displayName = displayName,
-            description = description,
+            description = "Test Description",
             avatar = "https://example.com/avatar.png",
             banner = "https://example.com/banner.png",
             followersCount = 100,
@@ -118,12 +164,28 @@ class UserServiceTest : BaseTest() {
         )
     }
 
-    private fun stubApiGet(endpoint: String, token: String, responseBody: Any, params: Map<String, StringValuePattern> = emptyMap()) {
+    private fun stubApiGet(
+        endpoint: String,
+        token: String,
+        responseBody: Any,
+        params: Map<String, Any> = emptyMap()
+    ) {
+        val stub = get(
+            urlPathMatching("$endpoint.*"))
+            .withHeader("Authorization", equalTo("Bearer $token"))
+
+        params.forEach { (key, value) ->
+            if (value !is Collection<*>) {
+                stub.withQueryParam(key, equalTo(value.toString()))
+            }
+        }
+
         wireMockServer.stubFor(
-            get(urlPathEqualTo(endpoint))
-                .withHeader("Authorization", equalTo("Bearer $token"))
-                .withQueryParams(params)
-                .willReturn(aResponse().withStatus(200).withBody(Jackson.asFormatString(responseBody)))
+            stub.willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withBody(Jackson.asFormatString(responseBody))
+            )
         )
     }
 
@@ -131,7 +193,7 @@ class UserServiceTest : BaseTest() {
         redisService.jsonSet("profile:$did", profile)
     }
 
-    private fun verifyProfile(actual: Profile, expected: Profile) {
+    private fun verifyProfile(actual: Profile?, expected: Profile) {
         assertThat(actual).usingRecursiveComparison().isEqualTo(expected)
     }
 
@@ -148,11 +210,16 @@ class UserServiceTest : BaseTest() {
         wireMockServer.verify(verifier)
     }
 
-    private fun verifyApiGet(endpoint: String, token: String, params: Map<String, StringValuePattern> = emptyMap()) {
-        val request = getRequestedFor(urlPathEqualTo(endpoint))
+    private fun verifyApiGet(endpoint: String, token: String, params: Map<String, Any> = emptyMap()) {
+        val request = getRequestedFor(urlPathMatching("$endpoint.*"))
             .withHeader("Authorization", equalTo("Bearer $token"))
-        for ((key, value) in params) {
-            request.withQueryParam(key, value)
+
+        params.forEach { (key, value) ->
+            if (value is List<*>) {
+                request.withQueryParam(key, havingExactly(*value.map { equalTo(it.toString()) }.toTypedArray()))
+            } else {
+                request.withQueryParam(key, equalTo(value.toString()))
+            }
         }
 
         wireMockServer.verify(request)

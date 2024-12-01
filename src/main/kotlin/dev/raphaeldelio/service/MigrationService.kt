@@ -36,9 +36,6 @@ class MigrationService(
     fun migrateUsers(token: String) {
         val followedAuthors = userService.getAllFollowedUsers()
         Logger.info("🚚 Migrating ${followedAuthors.size} followed authors")
-
-        followedAuthors.forEach { authorDid ->
-            userService.getProfile(token, authorDid)
-        }
+        userService.getProfiles(token, followedAuthors)
     }
 }

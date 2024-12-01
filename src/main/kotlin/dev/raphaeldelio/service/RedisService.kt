@@ -32,7 +32,7 @@ class RedisService(private val jedisPooled: JedisPooled) {
     }
 
     fun jsonGet(key: String): Any? {
-        return jedisPooled.jsonGet(key) ?: return null
+        return jedisPooled.jsonGet(key)
     }
 
     inline fun <reified T: Any> jsonGetAs(key: String): T? {
