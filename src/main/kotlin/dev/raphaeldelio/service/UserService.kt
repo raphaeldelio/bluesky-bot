@@ -22,7 +22,7 @@ class UserService(
     }
 
     fun followUser(token: String, authorDid: String) {
-        val repo = redisService.get("did") ?: error("DID not found in Redis")
+        val repo = redisService.stringGet("did") ?: error("DID not found in Redis")
         val followData = FollowData(repo = repo, record = FollowRecord(subject = authorDid))
 
         performAction(

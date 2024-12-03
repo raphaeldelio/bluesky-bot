@@ -30,7 +30,7 @@ class AuthenticationService(
         val response = sendRequest(request)
         return if (response.status == Status.OK) {
             val result = Jackson.asA(response.bodyString(), LoginResponse::class)
-            redisService.set("did", result.did)
+            redisService.stringSet("did", result.did)
             Logger.info("✅ Login successful. DID: ${result.did}")
             result.accessJwt
         } else {

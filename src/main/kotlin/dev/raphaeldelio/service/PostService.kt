@@ -87,7 +87,7 @@ class PostService(
 
     private fun createActionData(collection: String, post: Post): RepostData {
         return RepostData(
-            repo = redisService.get("did") ?: throw IllegalArgumentException("DID not found in Redis"),
+            repo = redisService.stringGet("did") ?: throw IllegalArgumentException("DID not found in Redis"),
             collection = collection,
             rkey = "",
             validate = false,

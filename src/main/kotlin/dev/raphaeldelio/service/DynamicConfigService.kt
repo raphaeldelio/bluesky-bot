@@ -7,10 +7,10 @@ class DynamicConfigService(private val redisService: RedisService) {
     }
 
     fun getVersion(): String {
-        return redisService.get("${PREFIX}version") ?: "0.1.0"
+        return redisService.stringGet("${PREFIX}version") ?: "0.1.0"
     }
 
     fun setVersion(version: String) {
-        redisService.set("${PREFIX}version", version)
+        redisService.stringSet("${PREFIX}version", version)
     }
 }

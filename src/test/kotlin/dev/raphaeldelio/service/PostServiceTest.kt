@@ -121,7 +121,7 @@ class PostServiceTest : BaseTest() {
 
         val redisService = createRedisService()
         val blueskyService = createPostService()
-        redisService.set("did", "did:example:123")
+        redisService.stringSet("did", "did:example:123")
 
         // Act
         blueskyService.handlePostAction("test-access-token", post, PostService.Action.LIKE)
@@ -167,7 +167,7 @@ class PostServiceTest : BaseTest() {
 
         val redisService = createRedisService()
         val blueskyService = createPostService()
-        redisService.set("did", "did:example:123")
+        redisService.stringSet("did", "did:example:123")
 
         // Act
         blueskyService.handlePostAction("test-access-token", post, PostService.Action.REPOST)
@@ -199,7 +199,7 @@ class PostServiceTest : BaseTest() {
             quoteCount = 0
         )
         val redisService = createRedisService()
-        redisService.set("did", "did:example:123")
+        redisService.stringSet("did", "did:example:123")
 
         redisService.setAdd("likedPosts", post.uri) // Simulate post already liked
 

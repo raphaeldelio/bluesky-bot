@@ -29,7 +29,7 @@ class UserServiceTest : BaseTest() {
 
         val userService = createUserService()
         val redisService = createRedisService()
-        redisService.set("did", authorDid)
+        redisService.stringSet("did", authorDid)
 
         // Act
         userService.followUser(token, authorDid)

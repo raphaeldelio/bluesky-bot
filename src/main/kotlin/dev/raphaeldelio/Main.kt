@@ -21,7 +21,7 @@ fun main() {
     val postService = PostService(config.bluesky, redisService)
     val userService = UserService(config.bluesky, redisService)
     val dynamicConfigService = DynamicConfigService(redisService)
-    val migrationService = MigrationService(userService, dynamicConfigService)
+    val migrationService = MigrationService(redisService, userService, dynamicConfigService)
 
     Runtime.getRuntime().addShutdownHook(Thread {
         Logger.info("⏼ Shutting down application. Closing Redis connections.")
@@ -69,7 +69,7 @@ fun process(
     Logger.info("🚀 Starting task.")
     val now = OffsetDateTime.now()
     val lastRun = OffsetDateTime.parse(
-        redisService.get("lastRun") ?: posterConfig.since.toString()
+        redisService.stringGet("lastRun") ?: posterConfig.since.toString()
     )
     Logger.info("Fetching posts since $lastRun")
 
@@ -84,6 +84,6 @@ fun process(
         userService.getProfile(token, post.author.did)
     }
 
-    redisService.set("lastRun", now.toString())
+    redisService.stringSet("lastRun", now.toString())
     Logger.info("🎉 Task completed. Next run in ${posterConfig.scheduler.frequencyminutes} minutes.")
 }
