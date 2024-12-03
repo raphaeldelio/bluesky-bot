@@ -50,6 +50,6 @@ class AuthenticationServiceTest : BaseTest() {
         // Assert
         assertThat(accessToken).isEqualTo("test-access-token")
         val redisService = createRedisService()
-        assertThat(redisService.get("did")).isEqualTo("did:example:123")
+        assertThat(redisService.stringGet("did")).isEqualTo("did:example:123")
     }
 }

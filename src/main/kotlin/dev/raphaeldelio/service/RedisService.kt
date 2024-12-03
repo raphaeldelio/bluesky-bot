@@ -2,19 +2,23 @@ package dev.raphaeldelio.service
 
 import org.http4k.format.Jackson
 import redis.clients.jedis.JedisPooled
+import redis.clients.jedis.search.IndexOptions
+import redis.clients.jedis.search.Schema
 
 class RedisService(private val jedisPooled: JedisPooled) {
-    fun get(key: String): String? {
+    // String
+    fun stringGet(key: String): String? {
         return jedisPooled.get(key)
     }
 
-    fun set(key: String, value: String, expireSeconds: Long? = null) {
+    fun stringSet(key: String, value: String, expireSeconds: Long? = null) {
         jedisPooled.set(key, value)
         if (expireSeconds != null) {
             jedisPooled.expire(key, expireSeconds)
         }
     }
 
+    // Set
     fun setAdd(key: String, value: String) {
         jedisPooled.sadd(key, value)
     }
@@ -27,6 +31,7 @@ class RedisService(private val jedisPooled: JedisPooled) {
         return jedisPooled.smembers(key)
     }
 
+    // Json
     fun jsonSet(key: String, json: Any) {
         jedisPooled.jsonSet(key, Jackson.asFormatString(json))
     }
@@ -39,4 +44,15 @@ class RedisService(private val jedisPooled: JedisPooled) {
         val json = jsonGet(key) ?: return null
         return Jackson.asA<T>(Jackson.asFormatString(json))
     }
+
+    // Redis Search (Full Text)
+    fun ftList(): Set<String> {
+        return jedisPooled.ftList()
+    }
+
+    fun ftCreateIndex(indexName: String, options: IndexOptions, schema: Schema) {
+        jedisPooled.ftCreate(indexName, options, schema)
+    }
+
+
 }
