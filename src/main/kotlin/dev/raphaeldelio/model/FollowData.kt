@@ -6,7 +6,7 @@ import java.time.Instant
 data class FollowData(
     @JsonProperty("repo") val repo: String,
     @JsonProperty("collection") val collection: String = "app.bsky.graph.follow", // Namespace for follows
-    @JsonProperty("rkey") val rkey: String? = "",
+    //@JsonProperty("rkey") val rkey: String? = null,
     @JsonProperty("validate") val validate: Boolean? = false,
     @JsonProperty("record") val record: FollowRecord
 )

@@ -3,10 +3,8 @@ package dev.raphaeldelio.service
 import dev.raphaeldelio.Logger
 import dev.raphaeldelio.model.*
 import org.http4k.client.ApacheClient
-import org.http4k.client.ApacheClient.invoke
 import org.http4k.core.Method
 import org.http4k.core.Request
-import org.http4k.core.Request.Companion.invoke
 import org.http4k.core.Response
 import org.http4k.core.Status
 import org.http4k.format.Jackson
@@ -89,7 +87,6 @@ class PostService(
         return RepostData(
             repo = redisService.stringGet("did") ?: throw IllegalArgumentException("DID not found in Redis"),
             collection = collection,
-            rkey = "",
             validate = false,
             record = RepostRecord(
                 subject = Subject(

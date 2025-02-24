@@ -6,7 +6,7 @@ import java.time.Instant
 data class RepostData(
     @JsonProperty("repo") val repo: String,
     @JsonProperty("collection") val collection: String,
-    @JsonProperty("rkey") val rkey: String? = "", // Optional
+    //@JsonProperty("rkey") val rkey: String? = null, // Optional
     @JsonProperty("validate") val validate: Boolean? = false, // Optional
     @JsonProperty("record") val record: RepostRecord
 )
